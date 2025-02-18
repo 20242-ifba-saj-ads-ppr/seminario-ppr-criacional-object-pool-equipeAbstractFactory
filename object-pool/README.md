@@ -216,3 +216,144 @@ PoolInterface<CheapObject> pool = new SimplePool<CheapObject>(1, new CheapObject
 
 
 ## Referências
+
+
+## Outros Exemplos de Código
+
+### Exemplo prático: Pool de conexões com banco de dados
+
+Imagine que temos um sistema que precisa abrir muitas conexões com o banco de dados.
+Criar e destruir uma conexão toda vez seria lento e ineficiente.
+Para resolver isso, usamos um Object Pool que mantém algumas conexões prontas para uso.
+Quando um cliente precisa de uma conexão, ele pega do pool. Quando termina, ele devolve, em vez de destruir.
+
+### UML do Object Pool 
+
+```mermaid
+classDiagram
+    class Conexao {
+        + usar()
+        + liberar()
+    }
+
+    class ConexaoPool {
+        - List<Conexao> conexoesDisponiveis
+        - List<Conexao> conexoesEmUso
+        + getConexao(): Conexao
+        + liberarConexao(Conexao): void
+    }
+
+    class Cliente {
+        + main(String[] args)
+    }
+
+    ConexaoPool "1" -- "*" Conexao : gerencia
+    Cliente ..> ConexaoPool : usa
+```
+
+### Código Java do Object Pool:
+
+#### Classe Conexao (Objeto a ser reutilizado)
+
+```java
+public class Conexao {
+    private boolean emUso;
+
+    public Conexao() {
+        this.emUso = false;
+    }
+
+    public void usar() {
+        emUso = true;
+        System.out.println("Conexão em uso...");
+    }
+
+    public void liberar() {
+        emUso = false;
+        System.out.println("Conexão liberada.");
+    }
+
+    public boolean estaEmUso() {
+        return emUso;
+    }
+}
+```
+
+#### Classe ConexaoPool (Gerenciador do Pool)
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class ConexaoPool {
+    private List<Conexao> conexoesDisponiveis;
+    private List<Conexao> conexoesEmUso;
+    private int tamanhoMaximo;
+
+    public ConexaoPool(int tamanhoMaximo) {
+        this.tamanhoMaximo = tamanhoMaximo;
+        conexoesDisponiveis = new ArrayList<>();
+        conexoesEmUso = new ArrayList<>();
+
+        // Criando um número inicial de conexões
+        for (int i = 0; i < tamanhoMaximo; i++) {
+            conexoesDisponiveis.add(new Conexao());
+        }
+    }
+
+    public synchronized Conexao getConexao() {
+        if (!conexoesDisponiveis.isEmpty()) {
+            Conexao conexao = conexoesDisponiveis.remove(0);
+            conexao.usar();
+            conexoesEmUso.add(conexao);
+            return conexao;
+        } else {
+            System.out.println("Nenhuma conexão disponível no momento.");
+            return null;
+        }
+    }
+
+    public synchronized void liberarConexao(Conexao conexao) {
+        if (conexoesEmUso.remove(conexao)) {
+            conexao.liberar();
+            conexoesDisponiveis.add(conexao);
+        }
+    }
+}
+```
+
+#### Classe Cliente (Usa o Pool)
+
+```java	
+public class Cliente {
+    public static void main(String[] args) {
+        ConexaoPool pool = new ConexaoPool(2); // Criando um pool com 2 conexões
+
+        // Pegando conexões do pool
+        Conexao conexao1 = pool.getConexao();
+        Conexao conexao2 = pool.getConexao();
+        Conexao conexao3 = pool.getConexao(); // Esse deve falhar, pois o pool está cheio
+
+        // Liberando uma conexão e reutilizando
+        if (conexao1 != null) {
+            pool.liberarConexao(conexao1);
+        }
+
+        Conexao conexao4 = pool.getConexao(); // Agora essa conexão pode ser reutilizada
+    }
+}
+```
+
+#### Explicação do Código
+	1.	Criamos a classe Conexao, que simula uma conexão com o banco de dados e pode ser usada ou liberada.
+	2.	Criamos a classe ConexaoPool, que gerencia uma lista de conexões disponíveis e em uso.
+	3.	No método getConexao(), o pool fornece uma conexão já existente, evitando criar uma nova.
+	4.	No método liberarConexao(), a conexão é devolvida ao pool para ser reutilizada.
+	5.	Na classe Cliente, simulamos a obtenção e devolução de conexões, mostrando como o pool otimiza o uso de recursos.
+
+#### Participantes
+
+
+	1.	Reusable (Objeto reutilizável) → Em nosso código, a classe Conexao representa esse papel, pois é o objeto que queremos reaproveitar no pool.
+	2.	Pool (Gerenciador do Pool) → A classe ConexaoPool atua como o gerenciador do pool, controlando quais objetos estão disponíveis e quais estão em uso.
+	3.	Client (Cliente que usa o Pool) → A classe Cliente utiliza ConexaoPool para obter conexões e liberar quando não precisar mais.
