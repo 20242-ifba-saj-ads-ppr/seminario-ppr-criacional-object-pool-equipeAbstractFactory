@@ -220,140 +220,80 @@ PoolInterface<CheapObject> pool = new SimplePool<CheapObject>(1, new CheapObject
 
 ## Outros Exemplos de Código
 
-### Exemplo prático: Pool de conexões com banco de dados
+### Exemplo prático: Pool de particulas em um jogo
 
-Imagine que temos um sistema que precisa abrir muitas conexões com o banco de dados.
-Criar e destruir uma conexão toda vez seria lento e ineficiente.
-Para resolver isso, usamos um Object Pool que mantém algumas conexões prontas para uso.
-Quando um cliente precisa de uma conexão, ele pega do pool. Quando termina, ele devolve, em vez de destruir.
+Considere a seguinte situação: estamos desenvolvendo um jogo onde explosões e efeitos de fogo ocorrem frequentemente. Cada vez que uma explosão acontece, dezenas ou centenas de partículas de fogo são geradas para criar um efeito visual realista.
+
+Se criarmos e destruirmos essas partículas dinamicamente toda vez que uma explosão ocorre, o jogo sofrerá quedas de desempenho devido ao custo de alocação de memória e garbage collection.
+
+Uma abordagem mais eficiente seria reutilizar as partículas, evitando recriação constante. Podemos manter um pool de partículas que são ativadas e desativadas conforme necessário.
+
+Dessa forma, melhoramos a eficiência do jogo, reduzindo o consumo de memória e o tempo de processamento.
+
+
 
 ### UML do Object Pool 
 
 ```mermaid
 classDiagram
-    class Conexao {
-        + usar()
-        + liberar()
+    direction TB
+
+    class IPool {
+        +acquire() T
+        +release(t: T) void
     }
 
-    class ConexaoPool {
-        - List<Conexao> conexoesDisponiveis
-        - List<Conexao> conexoesEmUso
-        + getConexao(): Conexao
-        + liberarConexao(Conexao): void
+    class Particle {
+        -isActive: boolean
+        +Particle()
+        +turnOn() void
+        +turnOff() void
+        +isActive() boolean
     }
 
-    class Cliente {
-        + main(String[] args)
+    class ParticlePool {
+        -particles: Collection~Particle~
+        +ParticlePool(qtd: int)
+        +acquire() Particle
+        +release(particle: Particle) void
     }
 
-    ConexaoPool "1" -- "*" Conexao : gerencia
-    Cliente ..> ConexaoPool : usa
+    class App {
+    }
+
+    IPool <|-- ParticlePool
+    ParticlePool o-- Particle
+    App --> ParticlePool
+
 ```
 
 ### Código Java do Object Pool:
 
-#### Classe Conexao (Objeto a ser reutilizado)
+#### Interface Pool
+@import "./object-pool-gameParticle/src/contracts/IPool.java"
 
-```java
-public class Conexao {
-    private boolean emUso;
+#### Classe Particle (Objeto a ser reutilizado)
+@import "./object-pool-gameParticle/src/effects/Particle.java"
 
-    public Conexao() {
-        this.emUso = false;
-    }
+#### Classe ParticlePool (Gerenciador do Pool)
+@import "./object-pool-gameParticle/src/pools/ParticlePool.java"
 
-    public void usar() {
-        emUso = true;
-        System.out.println("Conexão em uso...");
-    }
+#### Classe Main (Cliente)
+@import "./object-pool-gameParticle/src/App.java"
 
-    public void liberar() {
-        emUso = false;
-        System.out.println("Conexão liberada.");
-    }
-
-    public boolean estaEmUso() {
-        return emUso;
-    }
-}
-```
-
-#### Classe ConexaoPool (Gerenciador do Pool)
-
-```java
-import java.util.ArrayList;
-import java.util.List;
-
-public class ConexaoPool {
-    private List<Conexao> conexoesDisponiveis;
-    private List<Conexao> conexoesEmUso;
-    private int tamanhoMaximo;
-
-    public ConexaoPool(int tamanhoMaximo) {
-        this.tamanhoMaximo = tamanhoMaximo;
-        conexoesDisponiveis = new ArrayList<>();
-        conexoesEmUso = new ArrayList<>();
-
-        // Criando um número inicial de conexões
-        for (int i = 0; i < tamanhoMaximo; i++) {
-            conexoesDisponiveis.add(new Conexao());
-        }
-    }
-
-    public synchronized Conexao getConexao() {
-        if (!conexoesDisponiveis.isEmpty()) {
-            Conexao conexao = conexoesDisponiveis.remove(0);
-            conexao.usar();
-            conexoesEmUso.add(conexao);
-            return conexao;
-        } else {
-            System.out.println("Nenhuma conexão disponível no momento.");
-            return null;
-        }
-    }
-
-    public synchronized void liberarConexao(Conexao conexao) {
-        if (conexoesEmUso.remove(conexao)) {
-            conexao.liberar();
-            conexoesDisponiveis.add(conexao);
-        }
-    }
-}
-```
-
-#### Classe Cliente (Usa o Pool)
-
-```java	
-public class Cliente {
-    public static void main(String[] args) {
-        ConexaoPool pool = new ConexaoPool(2); // Criando um pool com 2 conexões
-
-        // Pegando conexões do pool
-        Conexao conexao1 = pool.getConexao();
-        Conexao conexao2 = pool.getConexao();
-        Conexao conexao3 = pool.getConexao(); // Esse deve falhar, pois o pool está cheio
-
-        // Liberando uma conexão e reutilizando
-        if (conexao1 != null) {
-            pool.liberarConexao(conexao1);
-        }
-
-        Conexao conexao4 = pool.getConexao(); // Agora essa conexão pode ser reutilizada
-    }
-}
-```
 
 #### Explicação do Código
-	1.	Criamos a classe Conexao, que simula uma conexão com o banco de dados e pode ser usada ou liberada.
-	2.	Criamos a classe ConexaoPool, que gerencia uma lista de conexões disponíveis e em uso.
-	3.	No método getConexao(), o pool fornece uma conexão já existente, evitando criar uma nova.
-	4.	No método liberarConexao(), a conexão é devolvida ao pool para ser reutilizada.
-	5.	Na classe Cliente, simulamos a obtenção e devolução de conexões, mostrando como o pool otimiza o uso de recursos.
+1. Criamos a classe Particle, que representa uma partícula de fogo e pode ser ativada (turnOn()) ou desativada (turnOff()).
+2. Criamos a interface IPool, que define os métodos acquire() e release() para controle de recursos.
+3. Criamos a classe ParticlePool, que gerencia uma lista de partículas disponíveis e as reutiliza quando possível.
+4. No método acquire(), o pool fornece uma partícula inativa, evitando criar uma nova instância desnecessariamente.
+5. No método release(), a partícula é desativada e devolvida ao pool para ser reutilizada futuramente.
+6. Na classe App, simulamos um jogo em que partículas são usadas para explosões e depois reutilizadas, reduzindo o impacto no desempenho.
 
-#### Participantes
-
-
-	1.	Reusable (Objeto reutilizável) → Em nosso código, a classe Conexao representa esse papel, pois é o objeto que queremos reaproveitar no pool.
-	2.	Pool (Gerenciador do Pool) → A classe ConexaoPool atua como o gerenciador do pool, controlando quais objetos estão disponíveis e quais estão em uso.
-	3.	Client (Cliente que usa o Pool) → A classe Cliente utiliza ConexaoPool para obter conexões e liberar quando não precisar mais.
+### Participantes
+- **Product (Particle)**
+Define os objetos gerenciados pelo pool. Neste caso, Particle representa uma partícula gráfica que pode ser ativada ou desativada.
+- **Pool (IPool)**
+Interface que define os métodos para aquisição (acquire()) e liberação (release()) dos objetos gerenciados.
+- **ConcretePool (ParticlePool)**
+Implementação do IPool, responsável por gerenciar um conjunto de Particle e otimizar seu uso reutilizando-as em vez de criar novas instâncias.
